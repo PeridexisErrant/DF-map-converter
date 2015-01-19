@@ -1,5 +1,6 @@
 
-import PIL, os, glob
+import os, glob
+from PIL import Image
 
 """Make pretty maps - fantasy and satellite style - from DF exports.
 
@@ -51,5 +52,19 @@ def make_fantasy_map():
 
     # images will be a dict of Image objects, same keys as the above
     images = {}
+    for k in maps.keys():
+        images[k] = Image.open(maps[k])
+    for k in pics.keys():
+        images[k] = Image.open(pics[k])
 
     # TODO:  process images
+
+    # set up layers in order
+    # remove land from ocean layers, ocean from land layers
+    #    by color-select and transparency
+    # fill land with dirt pattern
+    # fill mountain biome with mountain pattern
+    # add tree layer, transparency dependin on veg density
+
+
+
