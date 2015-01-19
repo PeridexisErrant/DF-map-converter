@@ -59,31 +59,60 @@ def tile_pic(pic, size):
     return result_image
 
 def ocean_mask(image_elw):
-    """Returns an oceanmask layer; black==land and white==ocean."""
-    image_oceanMask = Image.new('L', image_elw.size, color=255)
+    """Returns an oceanmask layer; white==ocean."""
+    image_oceanMask = Image.new('L', image_elw.size, color=0)
     pixdata = image_elw.load()
     oceanMask = image_oceanMask.load()
     for y in range(image_elw.size[1]):
         for x in range(image_elw.size[0]):
-            # if green channel is empty, pixel is ocean
+            # if green channel, pixel is not ocean
             if not pixdata[x, y][1] > 0:
-                oceanMask[x, y] = 0
+                oceanMask[x, y] = 255
     return image_oceanMask
 
-def ocean_layer(image_bm, image_elw, mask):
-    """Returns an oceanmask layer; black==land and white==ocean."""
-    image_ocean = Image.new('RGBA', image_elw.size, (0, 0, 0, 255))
+def ocean_layer(image_bm, image_el, mask):
+    """Returns an ocean layer, colored oceans and transparent land."""
+    image_ocean = Image.new('RGBA', image_el.size, (0, 0, 0, 255))
     bm = image_bm.load()
-    elw = image_elw.load()
+    el = image_el.load()
     ocean = image_ocean.load()
     mask = mask.load()
-    for y in range(image_elw.size[1]):
-        for x in range(image_elw.size[0]):
-            if not mask[x, y]:
-                blue = int((bm[x, y][2] + elw[x, y][2]*3) / 3 * 1.2)
+    for y in range(image_el.size[1]):
+        for x in range(image_el.size[0]):
+            if mask[x, y]:
+                blue = int((bm[x, y][2] + el[x, y][2]*3) / 3 * 1.2)
                 green = int((bm[x, y][1] / bm[x, y][2]) * blue)
                 ocean[x, y] = (0, green, blue, 0)
     return image_ocean
+
+def mountain_mask(image_bm):
+    """Return a mountain biome mask, white=mountains"""
+    mtns_mask = Image.new('L', image_bm.size, (0))
+    mtns = mtns_mask.load()
+    bm = image_bm.load()
+    for y in range(image_bm.size[1]):
+        for x in range(image_bm.size[0]):
+            # mountain biome is mid-grey
+            if bm[x, y] == (128, 128, 128):
+                mtns[x, y] = 255
+    return mtns_mask
+
+def mountain_layer(image_mtns, image_el, mask):
+    """Return a mountain layer, including elevation for snowcaps."""
+    mtns_layer = Image.new('RGBA', image_el.size, (0, 0, 0, 255))
+    mtns = mtns_layer.load()
+    image_mtns = image_mtns.load()
+    el = image_el.load()
+    mask = mask.load()
+    for y in range(image_el.size[1]):
+        for x in range(image_el.size[0]):
+            if mask[x, y]:
+                if el[x, y][0] > 200: # above snow line
+                    g = int((el[x, y][0] + image_mtns[x, y][0]) / 1.5)
+                else:
+                    g = int((el[x, y][0] + image_mtns[x, y][0]) / 2.5)
+                mtns[x, y] = (g, g, g)
+    return mtns_layer
 
 def make_fantasy_map():
     """Makes the fantasy map - a work in progress."""
@@ -102,24 +131,24 @@ def make_fantasy_map():
 
     # make ocean transparent in land images
     images['oceanMask'] = ocean_mask(images['elw'])
-    for i in ('el', 'tmp', 'veg', 'vol', 'dirt'):
-        images[i].putalpha(images['oceanMask'])
-
-    for i in ('elw', 'bm'):
-        images[i].putalpha(ImageOps.invert(images['oceanMask']))
 
 
 
     # generate ocean pattern from colors in bm, elw
     # oceanlayer is a combination of depth (from elw) and biome (from bm)
-    images['ocean'] = ocean_layer(images['bm'], images['el'], images['oceanMask'])
-    images['fantasy'].paste(images['ocean'], (0, 0), ImageOps.invert(images['oceanMask']))
+    images['ocean'] = ocean_layer(images['bm'], images['el'],
+                                  images['oceanMask'])
+    images['fantasy'].paste(images['ocean'], (0, 0), images['oceanMask'])
 
     # fill land with dirt pattern
-    images['fantasy'].paste(images['dirt'], (0, 0), images['oceanMask'])
+    images['fantasy'].paste(images['dirt'], (0, 0),
+                            ImageOps.invert(images['oceanMask']))
 
     # fill mountain biome with mountain pattern
-
+    images['mtn_mask'] = mountain_mask(images['bm'])
+    images['mtn_bm'] = mountain_layer(images['mountains'], images['el'],
+                                      images['mtn_mask'])
+    images['fantasy'].paste(images['mtn_bm'], (0, 0), images['mtn_mask'])
 
     # add tree layer, transparency depending on veg density
 
