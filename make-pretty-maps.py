@@ -108,11 +108,18 @@ def mountain_layer(image_mtns, image_el, mask):
         for x in range(image_el.size[0]):
             if mask[x, y]:
                 if el[x, y][0] > 200: # above snow line
-                    g = int((el[x, y][0] + image_mtns[x, y][0]) / 1.5)
+                    g = int((el[x, y][0] * image_mtns[x, y][0]) * 2 / 255)
                 else:
-                    g = int((el[x, y][0] + image_mtns[x, y][0]) / 2.5)
+                    g = int((el[x, y][0] * image_mtns[x, y][0]) * 1.4 / 255)
                 mtns[x, y] = (g, g, g)
     return mtns_layer
+
+def veg_layer(image_veg, image_bm, image_trees):
+    """Return layer with color per biome, and alpha per veg."""
+    veg_layer = Image.blend(image_bm.convert('RGB'),
+                            image_trees.convert('RGB'), 0.5)
+    veg_layer.putalpha(image_veg.convert('L'))
+    return veg_layer
 
 def make_fantasy_map():
     """Makes the fantasy map - a work in progress."""
@@ -129,13 +136,8 @@ def make_fantasy_map():
     # initialise fantasy map image in black
     images['fantasy'] = Image.new('RGB', images['bm'].size)
 
-    # make ocean transparent in land images
-    images['oceanMask'] = ocean_mask(images['elw'])
-
-
-
     # generate ocean pattern from colors in bm, elw
-    # oceanlayer is a combination of depth (from elw) and biome (from bm)
+    images['oceanMask'] = ocean_mask(images['elw'])
     images['ocean'] = ocean_layer(images['bm'], images['el'],
                                   images['oceanMask'])
     images['fantasy'].paste(images['ocean'], (0, 0), images['oceanMask'])
@@ -151,8 +153,8 @@ def make_fantasy_map():
     images['fantasy'].paste(images['mtn_bm'], (0, 0), images['mtn_mask'])
 
     # add tree layer, transparency depending on veg density
-
-
+    images['veg_layer'] = veg_layer(images['veg'], images['bm'], images['trees'])
+    images['fantasy'].paste(images['veg_layer'], (0, 0), images['veg_layer'])
 
     # Finally, save the completed map.
     images['fantasy'].save('-'.join(get_region_info()) + '-fantasy.png',
