@@ -1,6 +1,7 @@
 
 import os, glob
 from PIL import Image
+from PIL import ImageOps
 
 """Make pretty maps - fantasy and satellite style - from DF exports.
 
@@ -69,6 +70,21 @@ def ocean_mask(image_elw):
                 oceanMask[x, y] = 0
     return image_oceanMask
 
+def ocean_layer(image_bm, image_elw, mask):
+    """Returns an oceanmask layer; black==land and white==ocean."""
+    image_ocean = Image.new('RGBA', image_elw.size, (0, 0, 0, 255))
+    bm = image_bm.load()
+    elw = image_elw.load()
+    ocean = image_ocean.load()
+    mask = mask.load()
+    for y in range(image_elw.size[1]):
+        for x in range(image_elw.size[0]):
+            if not mask[x, y]:
+                blue = int((bm[x, y][2] + elw[x, y][2]*3) / 3 * 1.2)
+                green = int((bm[x, y][1] / bm[x, y][2]) * blue)
+                ocean[x, y] = (0, green, blue, 0)
+    return image_ocean
+
 def make_fantasy_map():
     """Makes the fantasy map - a work in progress."""
     maps = get_png_maps()
@@ -77,23 +93,34 @@ def make_fantasy_map():
     # images is a dict of Image objects, same keys as above
     images = {}
     for k in maps.keys():
-        images[k] = Image.open(maps[k]).convert('RGBA')
+        images[k] = Image.open(maps[k])
     for k in pics.keys():
-        images[k] = Image.open(pics[k]).convert('RGBA')
+        images[k] = tile_pic(Image.open(pics[k]), images['el'].size)
 
-    # initialise fantasy map image
-    images['fantasy'] = images['bm'].copy()
+    # initialise fantasy map image in black
+    images['fantasy'] = Image.new('RGB', images['bm'].size)
 
     # make ocean transparent in land images
-
     images['oceanMask'] = ocean_mask(images['elw'])
-    for i in ('el', 'fantasy', 'tmp', 'veg', 'vol'):
+    for i in ('el', 'tmp', 'veg', 'vol', 'dirt'):
         images[i].putalpha(images['oceanMask'])
+
+    for i in ('elw', 'bm'):
+        images[i].putalpha(ImageOps.invert(images['oceanMask']))
+
 
 
     # generate ocean pattern from colors in bm, elw
+    # oceanlayer is a combination of depth (from elw) and biome (from bm)
+    images['ocean'] = ocean_layer(images['bm'], images['el'], images['oceanMask'])
+    images['fantasy'].paste(images['ocean'], (0, 0), ImageOps.invert(images['oceanMask']))
+
     # fill land with dirt pattern
+    images['fantasy'].paste(images['dirt'], (0, 0), images['oceanMask'])
+
     # fill mountain biome with mountain pattern
+
+
     # add tree layer, transparency depending on veg density
 
 
@@ -101,6 +128,7 @@ def make_fantasy_map():
     # Finally, save the completed map.
     images['fantasy'].save('-'.join(get_region_info()) + '-fantasy.png',
                            format='PNG', optimize=True)
+    images['fantasy'].show()
 
 make_fantasy_map()
 

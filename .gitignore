@@ -1,5 +1,6 @@
 # Reference to old map maker programs
 *.scm
+*-fantasy.png
 
 # Windows image file caches
 Thumbs.db
