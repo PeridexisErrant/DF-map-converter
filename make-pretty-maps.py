@@ -1,6 +1,7 @@
 
 import os, glob
 from PIL import Image
+from PIL import ImageFilter
 from PIL import ImageOps
 
 """Make pretty maps - fantasy and satellite style - from DF exports.
@@ -70,19 +71,25 @@ def ocean_mask(image_elw):
                 oceanMask[x, y] = 255
     return image_oceanMask
 
-def ocean_layer(image_bm, image_el, mask):
+def ocean_layer(image_bm, image_el, mask, dirt):
     """Returns an ocean layer, colored oceans and transparent land."""
     image_ocean = Image.new('RGBA', image_el.size, (0, 0, 0, 255))
     bm = image_bm.load()
     el = image_el.load()
     ocean = image_ocean.load()
     mask = mask.load()
+    dirt = dirt.filter(ImageFilter.BLUR).load()
     for y in range(image_el.size[1]):
         for x in range(image_el.size[0]):
             if mask[x, y]:
+                if not bm[x, y][1]:
+                    bm[x, y] = (0, 128, 255)
                 blue = int((bm[x, y][2] + el[x, y][2]*3) / 3 * 1.2)
-                green = int((bm[x, y][1] / bm[x, y][2]) * blue)
-                ocean[x, y] = (0, green, blue, 0)
+                if bm[x, y][1] == 255:
+                    ocean[x, y] = (int(dirt[x, y]*1.5), 255, 255, 0)
+                else:
+                    green = int((bm[x, y][1] / bm[x, y][2]) * blue)
+                    ocean[x, y] = (0, green, blue, 0)
     return image_ocean
 
 def mountain_mask(image_bm):
@@ -108,18 +115,11 @@ def mountain_layer(image_mtns, image_el, mask):
         for x in range(image_el.size[0]):
             if mask[x, y]:
                 if el[x, y][0] > 200: # above snow line
-                    g = int((el[x, y][0] * image_mtns[x, y][0]) * 2 / 255)
+                    g = int((el[x, y][0] * image_mtns[x, y][0]) * 3.2 / 255)
                 else:
-                    g = int((el[x, y][0] * image_mtns[x, y][0]) * 1.4 / 255)
+                    g = int((el[x, y][0] * image_mtns[x, y][0]) * 1.6 / 255)
                 mtns[x, y] = (g, g, g)
     return mtns_layer
-
-def veg_layer(image_veg, image_bm, image_trees):
-    """Return layer with color per biome, and alpha per veg."""
-    veg_layer = Image.blend(image_bm.convert('RGB'),
-                            image_trees.convert('RGB'), 0.5)
-    veg_layer.putalpha(image_veg.convert('L'))
-    return veg_layer
 
 def make_fantasy_map():
     """Makes the fantasy map - a work in progress."""
@@ -139,12 +139,14 @@ def make_fantasy_map():
     # generate ocean pattern from colors in bm, elw
     images['oceanMask'] = ocean_mask(images['elw'])
     images['ocean'] = ocean_layer(images['bm'], images['el'],
-                                  images['oceanMask'])
+                                  images['oceanMask'],
+                                  images['dirt'].convert('L'))
     images['fantasy'].paste(images['ocean'], (0, 0), images['oceanMask'])
 
     # fill land with dirt pattern
-    images['fantasy'].paste(images['dirt'], (0, 0),
-                            ImageOps.invert(images['oceanMask']))
+    images['fantasy'].paste(Image.blend(images['dirt'].convert('RGB'),
+                                        images['bm'].convert('RGB'), 0.1),
+                            (0, 0), ImageOps.invert(images['oceanMask']))
 
     # fill mountain biome with mountain pattern
     images['mtn_mask'] = mountain_mask(images['bm'])
@@ -153,13 +155,13 @@ def make_fantasy_map():
     images['fantasy'].paste(images['mtn_bm'], (0, 0), images['mtn_mask'])
 
     # add tree layer, transparency depending on veg density
-    images['veg_layer'] = veg_layer(images['veg'], images['bm'], images['trees'])
-    images['fantasy'].paste(images['veg_layer'], (0, 0), images['veg_layer'])
+    images['fantasy'].paste(Image.blend(images['bm'].convert('RGB'),
+                                        images['trees'].convert('RGB'), 0.4),
+                            (0, 0), images['veg'].convert('L'))
 
     # Finally, save the completed map.
     images['fantasy'].save('-'.join(get_region_info()) + '-fantasy.png',
                            format='PNG', optimize=True)
-    images['fantasy'].show()
 
 make_fantasy_map()
 

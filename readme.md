@@ -12,3 +12,6 @@ the PyLNP.
 
 Links:  [FMM](http://www.bay12forums.com/smf/index.php?topic=73095.msg2261106#
 msg2261106), [SMM](http://www.bay12forums.com/smf/index.php?topic=137076).
+
+Right now:  the script produces a less impressive version of the fantasy map,
+reminiscent of biome+elevation with the images tiled in.
