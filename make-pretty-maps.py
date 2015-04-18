@@ -43,9 +43,9 @@ def get_png_maps():
 
 def get_base_images():
     """Returns a dict of base pics short names and paths."""
-    return {'dirt':'f_dirt.png',
-            'mountains':'f_mountains.png',
-            'trees':'f_trees.png'}
+    return {'dirt':'fantasy_dirt.png',
+            'mountains':'fantasy_mountains.png',
+            'trees':'fantasy_trees.png'}
 
 def tile_pic(pic, size):
     """Repeat an image to the requested size (tile pics across map)."""
